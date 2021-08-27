@@ -1,11 +1,11 @@
 import numpy as np
 
 # equations from wikipedia
-def convert(r,V,M,m):
+def convert(r,V,M):
     r_abs = np.linalg.norm(r)
     V_abs = np.linalg.norm(V)
     G = 6.67408e-11
-    mu = G*(M+m)
+    mu = G*M
     # specific angular momentum vector
     h = np.cross(r,V)
     h_abs = np.linalg.norm(h)
@@ -45,4 +45,4 @@ def convert(r,V,M,m):
     return (a,e_abs,i,Omega,omega,v)
 
 if __name__=="__main__":
-    print(convert(np.array([1e10,2e10,3e10]),np.array([30,20,10]),2e30,1e30))
+    print(convert(np.array([1e9,2e9,3e9]),np.array([3000,2000,1000]),1.99e30))
