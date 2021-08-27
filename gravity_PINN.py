@@ -12,7 +12,6 @@ from random import random
 class gravity_pinn():
     def __init__(self, mass, max_radius, min_radius, batch_size, episodes):
         #tf.compat.v1.disable_eager_execution()
-        tf.get_logger().setLevel('INFO')
         self.episodes = episodes
         self.max_radius = max_radius
         self.min_radius = min_radius
