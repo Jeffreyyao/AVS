@@ -15,6 +15,9 @@ class gravity_pinn():
         self.train_size = 10000
         self.train_input = np.zeros((self.train_size,3), dtype=np.float)
         self.train_label = np.zeros((self.train_size,3), dtype=np.float)
+        self.test_size = 10
+        self.test_input = np.zeros((self.test_size,3), dtype=np.float)
+        self.test_label = np.zeros((self.test_size,3), dtype=np.float)
         self.episodes = episodes
         self.max_radius = max_radius
         self.min_radius = min_radius
@@ -37,7 +40,8 @@ class gravity_pinn():
     def get_true_acc(self, r):
         return np.dot(-self.mu,r)/(np.linalg.norm(r)**3)
     
-    def generate_train_data(self):
+    def generate_data(self):
+        # generate train data
         for i in range(self.train_size):
             # unit vector pointing at a random direction
             n = np.array([random()-0.5 for _ in range(3)])
@@ -45,6 +49,13 @@ class gravity_pinn():
             # multiply by magnitude to get position vector within desired range
             self.train_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
             self.train_label[i] = self.get_true_acc(self.train_input[i])
+
+        # generate test data
+        for i in range(self.test_size):
+            n = np.array([random()-0.5 for _ in range(3)])
+            n /= np.linalg.norm(n)
+            self.test_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
+            self.test_label[i] = self.get_true_acc(self.test_input[i])
 
     def train(self):
         for _ in tqdm(range(self.episodes)):
@@ -65,12 +76,26 @@ class gravity_pinn():
             self.optimizer.apply_gradients(zip(gradients,self.model.trainable_variables))
             self.train_loss(loss)
             self.losses.append(self.train_loss.result().numpy())
-        print(self.losses)
         _,ax = plt.subplots()
         ax.plot(np.arange(0,self.episodes,1),np.array(self.losses))
         plt.show()
+    
+    def test(self):
+        input_r = tf.convert_to_tensor(self.test_input)
+        with tf.GradientTape() as tape:
+            tape.watch(input_r)
+            U = self.model(input_r)
+        acc = tf.math.scalar_mul(-1.0,tape.gradient(U,input_r))
+        print("Comparing test data:")
+        print("label/pinn output")
+        for i in range(self.test_size):
+            print(self.test_label[i],acc[i].numpy())
+
 
 if __name__=="__main__":
-    model = gravity_pinn(mass=5.972e24,max_radius=6.371e6,min_radius=6.471e6,batch_size=100,episodes=100)
-    model.generate_train_data()
+    # earth radius: 6.371e6
+    # altitude to space: 0.1e6
+    model = gravity_pinn(mass=5.972e24,max_radius=6.371e6,min_radius=6.271e6,batch_size=100,episodes=100)
+    model.generate_data()
     model.train()
+    model.test()

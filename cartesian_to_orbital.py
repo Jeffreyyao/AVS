@@ -5,7 +5,7 @@ def convert(r,V,M):
     r_abs = np.linalg.norm(r)
     V_abs = np.linalg.norm(V)
     G = 6.67408e-11
-    mu = G*M
+    mu = 1
     # specific angular momentum vector
     h = np.cross(r,V)
     h_abs = np.linalg.norm(h)
