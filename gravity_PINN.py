@@ -12,9 +12,13 @@ from random import random
 class gravity_pinn():
     def __init__(self, mass, max_radius, min_radius, batch_size, episodes):
         #tf.compat.v1.disable_eager_execution()
+        self.train_size = 10000
+        self.train_input = np.zeros((self.train_size,3), dtype=np.float)
+        self.train_label = np.zeros((self.train_size,3), dtype=np.float)
         self.episodes = episodes
         self.max_radius = max_radius
         self.min_radius = min_radius
+        self.diff_radius = self.max_radius-self.min_radius
         self.batch_size = batch_size
         self.mass = mass
         self.G = 6.6743e-11
@@ -31,32 +35,31 @@ class gravity_pinn():
         self.losses = []
         
     def get_true_acc(self, r):
-        return tf.math.scalar_mul(-self.mu,tf.convert_to_tensor(r))/(tf.norm(r)**3)
+        return np.dot(-self.mu,r)/(np.linalg.norm(r)**3)
     
-    def get_train_batch(self):
-        desired_acc = [None for _ in range(self.batch_size)]
-        input_r = [None for _ in range(self.batch_size)]
-        diff_radius = self.max_radius-self.min_radius
-        for i in range(self.batch_size):
-            x = tf.constant(random()*diff_radius+self.min_radius,dtype=float)
-            y = tf.constant(random()*diff_radius+self.min_radius,dtype=float)
-            z = tf.constant(random()*diff_radius+self.min_radius,dtype=float)
-            input_r[i] = [x,y,z]
-            desired_acc[i] = self.get_true_acc(input_r[i])
-        return tf.convert_to_tensor(input_r), tf.convert_to_tensor(desired_acc)
+    def generate_train_data(self):
+        for i in range(self.train_size):
+            # unit vector pointing at a random direction
+            n = np.array([random()-0.5 for _ in range(3)])
+            n /= np.linalg.norm(n)
+            self.train_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
+            self.train_label[i] = self.get_true_acc(self.train_input[i])
 
     def train(self):
         for _ in tqdm(range(self.episodes)):
             self.train_loss.reset_states()
-            input_r,desired_acc = self.get_train_batch()
+            rand_indices = np.random.choice(self.train_size,self.batch_size)
+            input_r = tf.convert_to_tensor(self.train_input[rand_indices])
+            desired_acc = tf.convert_to_tensor(self.train_label[rand_indices])
             with tf.GradientTape() as tape_model:
                 with tf.GradientTape() as tape_input_r:
                     tape_input_r.watch(input_r)
-                    # gravitational potential is modeled by the NN
+                    # neural net outputs potential from position vector
                     U = self.model(input_r)
                 # gravitational acceleration = -grad(gravitational potential)
                 acc = tf.math.scalar_mul(-1.0,tape_input_r.gradient(U,input_r))
                 loss = self.loss_object(desired_acc,acc)
+            # taking the gradient of loss wrt model parameters
             gradients = tape_model.gradient(loss,self.model.trainable_variables)
             self.optimizer.apply_gradients(zip(gradients,self.model.trainable_variables))
             self.train_loss(loss)
@@ -67,5 +70,6 @@ class gravity_pinn():
         plt.show()
 
 if __name__=="__main__":
-    model = gravity_pinn(mass=5.972e24,max_radius=6.371e10,min_radius=6.372e10,batch_size=100,episodes=100)
+    model = gravity_pinn(mass=5.972e24,max_radius=6.371e6,min_radius=6.471e6,batch_size=100,episodes=100)
+    model.generate_train_data()
     model.train()
