@@ -42,6 +42,7 @@ class gravity_pinn():
             # unit vector pointing at a random direction
             n = np.array([random()-0.5 for _ in range(3)])
             n /= np.linalg.norm(n)
+            # multiply by magnitude to get position vector within desired range
             self.train_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
             self.train_label[i] = self.get_true_acc(self.train_input[i])
 
