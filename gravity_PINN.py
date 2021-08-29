@@ -95,7 +95,7 @@ class gravity_pinn():
 if __name__=="__main__":
     # earth radius: 6.371e6
     # altitude to space: 0.1e6
-    model = gravity_pinn(mass=5.972e24,max_radius=6.371e6,min_radius=6.271e6,batch_size=100,episodes=100)
+    model = gravity_pinn(mass=5.972e24,max_radius=6.471e6,min_radius=6.371e6,batch_size=100,episodes=100)
     model.generate_data()
     model.train()
     model.test()
