@@ -8,9 +8,9 @@ from random import random
 # initialize the class with 5 parameters
 # 1. the mass of the object the need to be modeled
 # 2,3. max and min radius of the training data
-# 4,5. batch size and episodes for training
+# 4,5. batch size and epoches for training
 class gravity_pinn():
-    def __init__(self, mass, max_radius, min_radius, batch_size, episodes):
+    def __init__(self, mass, max_radius, min_radius, batch_size, epoches):
         #tf.compat.v1.disable_eager_execution()
         self.train_size = 10000
         self.train_input = np.zeros((self.train_size,3), dtype=np.float)
@@ -18,7 +18,7 @@ class gravity_pinn():
         self.test_size = 10
         self.test_input = np.zeros((self.test_size,3), dtype=np.float)
         self.test_label = np.zeros((self.test_size,3), dtype=np.float)
-        self.episodes = episodes
+        self.epoches = epoches
         self.max_radius = max_radius
         self.min_radius = min_radius
         self.diff_radius = self.max_radius-self.min_radius
@@ -36,10 +36,25 @@ class gravity_pinn():
         self.model.build(input_shape=(1,3))
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
         self.losses = []
+        self.input_min, self.input_max = None, None
+        self.label_min, self.label_max = None, None
         
     def get_true_acc(self, r):
         return np.dot(-self.mu,r)/(np.linalg.norm(r)**3)
+
+    def normalize_input(self, array):
+        return (array-self.input_min)/(self.input_max-self.input_min)
+
+    def denormalize_input(self, array):
+        return array*(self.input_max-self.input_min)+self.input_min
+
+    def normalize_label(self, array):
+        return (array-self.label_min)/(self.label_max-self.label_min)
+
+    def denormalize_label(self, array):
+        return array*(self.label_max-self.label_min)+self.label_min
     
+    # call this before calling train function
     def generate_data(self):
         # generate train data
         for i in range(self.train_size):
@@ -57,8 +72,18 @@ class gravity_pinn():
             self.test_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
             self.test_label[i] = self.get_true_acc(self.test_input[i])
 
+        # min-max normalize train input and label
+        self.input_min = np.min(self.train_input,axis=0)
+        self.input_max = np.max(self.train_input,axis=0)
+        self.label_min = np.min(self.train_label)
+        self.label_max = np.max(self.train_label)
+        self.train_input = self.normalize_input(self.train_input)
+        self.train_label = self.normalize_label(self.train_label)
+        self.test_input = self.normalize_input(self.test_input)
+        self.test_label = self.normalize_label(self.test_label)
+
     def train(self):
-        for _ in tqdm(range(self.episodes)):
+        for _ in tqdm(range(self.epoches)):
             self.train_loss.reset_states()
             rand_indices = np.random.choice(self.train_size,self.batch_size)
             input_r = tf.convert_to_tensor(self.train_input[rand_indices])
@@ -68,16 +93,21 @@ class gravity_pinn():
                     tape_input_r.watch(input_r)
                     # neural net outputs potential from position vector
                     U = self.model(input_r)
+                # taking gradient of U wrt input_r times -1
                 # gravitational acceleration = -grad(gravitational potential)
                 acc = tf.math.scalar_mul(-1.0,tape_input_r.gradient(U,input_r))
                 loss = self.loss_object(desired_acc,acc)
             # taking the gradient of loss wrt model parameters
             gradients = tape_model.gradient(loss,self.model.trainable_variables)
-            self.optimizer.apply_gradients(zip(gradients,self.model.trainable_variables))
+            self.optimizer.apply_gradients(
+                (grad, var) 
+                for (grad, var) in zip(gradients, self.model.trainable_variables) 
+                if grad is not None)
             self.train_loss(loss)
             self.losses.append(self.train_loss.result().numpy())
+        print(self.losses)
         _,ax = plt.subplots()
-        ax.plot(np.arange(0,self.episodes,1),np.array(self.losses))
+        ax.plot(np.arange(0,self.epoches,1),np.array(self.losses))
         plt.show()
     
     def test(self):
@@ -89,13 +119,13 @@ class gravity_pinn():
         print("Comparing test data:")
         print("label/pinn output")
         for i in range(self.test_size):
-            print(self.test_label[i],acc[i].numpy())
+            print(self.denormalize_label(self.test_label[i]),self.denormalize_label(acc[i].numpy()))
 
 
 if __name__=="__main__":
     # earth radius: 6.371e6
     # altitude to space: 0.1e6
-    model = gravity_pinn(mass=5.972e24,max_radius=6.471e6,min_radius=6.371e6,batch_size=100,episodes=100)
+    model = gravity_pinn(mass=5.972e24,max_radius=6.471e6,min_radius=6.371e6,batch_size=200,epoches=100)
     model.generate_data()
     model.train()
     model.test()
