@@ -1,11 +1,12 @@
 import numpy as np
 
+G = 6.67408e-11
+
 # equations from wikipedia
-def convert(r,V,M):
+def to_keplerian(r,V,M):
     r_abs = np.linalg.norm(r)
     V_abs = np.linalg.norm(V)
-    G = 6.67408e-11
-    mu = 1
+    mu = G*M
     # specific angular momentum vector
     h = np.cross(r,V)
     h_abs = np.linalg.norm(h)
@@ -44,5 +45,13 @@ def convert(r,V,M):
     
     return (a,e_abs,i,Omega,omega,v)
 
+def to_cartesian(a, e, i, Omega, omeage, v, M):
+    mu = G*M
+
+    # mean anomly
+    M = np.math.sqrt(mu/a**3)
+
+    
+
 if __name__=="__main__":
-    print(convert(np.array([1e9,2e9,3e9]),np.array([3000,2000,1000]),1.99e30))
+    print(to_keplerian(np.array([1e9,2e9,3e9]),np.array([3000,2000,1000]),1.99e30))
