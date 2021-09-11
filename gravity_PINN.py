@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from random import random
+from spherical_harmonics import spherical_harmonics
 
 # modeling the gravity acceleration of a point mass
 # initialize the class with 5 parameters
@@ -10,7 +11,7 @@ from random import random
 # 2,3. max and min radius of the training data
 # 4,5. batch size and epoches for training
 class gravity_pinn():
-    def __init__(self, mass, max_radius, min_radius, batch_size, epoches):
+    def __init__(self, mass, max_radius, min_radius):
         #tf.compat.v1.disable_eager_execution()
         self.train_size = 10000
         self.train_input = np.zeros((self.train_size,3), dtype=np.float)
@@ -18,11 +19,11 @@ class gravity_pinn():
         self.test_size = 10
         self.test_input = np.zeros((self.test_size,3), dtype=np.float)
         self.test_label = np.zeros((self.test_size,3), dtype=np.float)
-        self.epoches = epoches
+        self.epoches = 100
         self.max_radius = max_radius
         self.min_radius = min_radius
         self.diff_radius = self.max_radius-self.min_radius
-        self.batch_size = batch_size
+        self.batch_size = 200
         self.mass = mass
         self.G = 6.6743e-11
         self.mu = self.mass*self.G
@@ -38,9 +39,17 @@ class gravity_pinn():
         self.losses = []
         self.input_min, self.input_max = None, None
         self.label_min, self.label_max = None, None
+
+        # sperical harmonics parameters
+        self.n_max = 2
+        self.m_max = 2
+        self.spherical_harmonics = spherical_harmonics(self.n_max,self.m_max,mass,min_radius)
         
-    def get_true_acc(self, r):
+    def get_true_acc_point_mass(self, r):
         return np.dot(-self.mu,r)/(np.linalg.norm(r)**3)
+    
+    def get_true_acc_SH(self,r):
+        return self.spherical_harmonics.acceleration(r);
 
     def normalize_input(self, array):
         return (array-self.input_min)/(self.input_max-self.input_min)
@@ -63,14 +72,14 @@ class gravity_pinn():
             n /= np.linalg.norm(n)
             # multiply by magnitude to get position vector within desired range
             self.train_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
-            self.train_label[i] = self.get_true_acc(self.train_input[i])
+            self.train_label[i] = self.get_true_acc_SH(self.train_input[i])
 
         # generate test data
         for i in range(self.test_size):
             n = np.array([random()-0.5 for _ in range(3)])
             n /= np.linalg.norm(n)
             self.test_input[i] = np.array(n*(random()*self.diff_radius+self.min_radius))
-            self.test_label[i] = self.get_true_acc(self.test_input[i])
+            self.test_label[i] = self.get_true_acc_SH(self.test_input[i])
 
         # min-max normalize train input and label
         self.input_min = np.min(self.train_input,axis=0)
@@ -125,7 +134,7 @@ class gravity_pinn():
 if __name__=="__main__":
     # earth radius: 6.371e6
     # altitude to space: 0.1e6
-    model = gravity_pinn(mass=5.972e24,max_radius=6.471e6,min_radius=6.371e6,batch_size=200,epoches=100)
+    model = gravity_pinn(mass=5.972e24,max_radius=6.471e6,min_radius=6.371e6)
     model.generate_data()
     model.train()
     model.test()
